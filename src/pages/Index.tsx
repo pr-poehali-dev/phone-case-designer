@@ -1,5 +1,18 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import Icon from "@/components/ui/icon";
+
+const CASE_IPHONE_IMG = "https://cdn.poehali.dev/projects/cf63e53f-9bbd-4994-8d75-abc1733f32fa/files/5565dd57-d506-4e41-87a7-26cb86c95140.jpg";
+const CASE_SAMSUNG_IMG = "https://cdn.poehali.dev/projects/cf63e53f-9bbd-4994-8d75-abc1733f32fa/files/4a1d7cf8-f77d-4805-bb01-22aca31a663a.jpg";
+
+const MODEL_IMAGES: Record<string, string> = {
+  "iPhone 15 Pro": CASE_IPHONE_IMG,
+  "iPhone 15": CASE_IPHONE_IMG,
+  "iPhone 14 Pro": CASE_IPHONE_IMG,
+  "Samsung S24": CASE_SAMSUNG_IMG,
+  "Samsung S23": CASE_SAMSUNG_IMG,
+  "Xiaomi 14": CASE_SAMSUNG_IMG,
+  "Google Pixel 8": CASE_SAMSUNG_IMG,
+};
 
 type Page = "home" | "catalog" | "constructor" | "cart" | "about" | "delivery" | "contacts" | "reviews" | "account";
 
@@ -41,6 +54,34 @@ export default function Index() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPass, setLoginPass] = useState("");
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [previewMode, setPreviewMode] = useState<"mockup" | "flat">("mockup");
+  const [textColor, setTextColor] = useState("#ffffff");
+  const [fontSize, setFontSize] = useState(14);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = useCallback((file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setUploadedImage(e.target?.result as string);
+      setSelectedPattern("Однотонный");
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileUpload(file);
+  }, [handleFileUpload]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFileUpload(file);
+  };
 
   const addToCart = (product: typeof products[0]) => {
     setCart(prev => [...prev, product]);
@@ -327,45 +368,115 @@ export default function Index() {
 
         {/* ===== CONSTRUCTOR ===== */}
         {page === "constructor" && (
-          <div className="max-w-6xl mx-auto px-6 py-12">
+          <div className="max-w-7xl mx-auto px-6 py-12">
             <p className="tag mb-2">Персонализация</p>
             <h1 className="font-display text-4xl font-bold mb-2">Конструктор дизайна</h1>
-            <p className="text-muted-foreground mb-10">Создайте уникальный чехол и сохраните дизайн в личном кабинете</p>
+            <p className="text-muted-foreground mb-8">Загрузите своё изображение и создайте уникальный чехол</p>
 
-            <div className="grid lg:grid-cols-2 gap-10">
-              {/* Preview */}
-              <div className="bg-card border border-border rounded-lg p-8 flex flex-col items-center justify-center min-h-[480px]">
-                <p className="tag mb-6">Предпросмотр</p>
-                <div className="relative">
-                  <div
-                    className="w-32 h-56 rounded-3xl border-4 border-white/20 shadow-2xl flex items-center justify-center transition-all duration-500"
-                    style={{ backgroundColor: selectedColor }}
-                  >
-                    <div className="w-24 h-48 rounded-2xl border border-white/10 flex flex-col items-center justify-center gap-2 overflow-hidden p-3 relative">
-                      {selectedPattern === "Полосы" && (
-                        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "repeating-linear-gradient(0deg, white 0px, white 2px, transparent 2px, transparent 12px)" }} />
-                      )}
-                      {selectedPattern === "Клетка" && (
-                        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "repeating-linear-gradient(0deg, white 0px, white 1px, transparent 1px, transparent 20px), repeating-linear-gradient(90deg, white 0px, white 1px, transparent 1px, transparent 20px)" }} />
-                      )}
-                      {selectedPattern === "Точки" && (
-                        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "radial-gradient(circle, white 1.5px, transparent 1.5px)", backgroundSize: "10px 10px" }} />
-                      )}
-                      {designText && (
-                        <span className="text-white/90 text-[9px] text-center font-bold break-all leading-tight z-10 px-1">
-                          {designText}
-                        </span>
+            <div className="grid xl:grid-cols-[1fr_420px] gap-10">
+
+              {/* ===== PREVIEW PANEL ===== */}
+              <div className="bg-card border border-border rounded-xl p-8 flex flex-col items-center">
+                {/* Mode toggle */}
+                <div className="flex gap-1 bg-secondary rounded-lg p-1 mb-8 self-start">
+                  {(["mockup", "flat"] as const).map(m => (
+                    <button
+                      key={m}
+                      onClick={() => setPreviewMode(m)}
+                      className={`px-4 py-1.5 rounded text-xs font-display font-medium transition-all ${previewMode === m ? "btn-gold" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      {m === "mockup" ? "Макет" : "Плоский вид"}
+                    </button>
+                  ))}
+                </div>
+
+                {previewMode === "mockup" ? (
+                  /* MOCKUP — реальное фото чехла с наложением */
+                  <div className="relative w-64 h-[420px] flex-shrink-0">
+                    <img
+                      src={MODEL_IMAGES[selectedModel]}
+                      alt={selectedModel}
+                      className="absolute inset-0 w-full h-full object-contain drop-shadow-2xl"
+                      style={{ filter: "drop-shadow(0 20px 40px rgba(0,0,0,0.6))" }}
+                    />
+                    {/* Оверлей дизайна поверх фото чехла */}
+                    <div
+                      className="absolute inset-0 rounded-[2rem] overflow-hidden flex flex-col items-center justify-center"
+                      style={{
+                        margin: "8% 14%",
+                        mixBlendMode: "multiply",
+                        opacity: uploadedImage ? 0.9 : 0.7,
+                      }}
+                    >
+                      {uploadedImage ? (
+                        <img src={uploadedImage} alt="Ваш дизайн" className="w-full h-full object-cover" />
+                      ) : (
+                        <div
+                          className="w-full h-full flex flex-col items-center justify-center relative overflow-hidden"
+                          style={{ backgroundColor: selectedColor }}
+                        >
+                          {selectedPattern === "Полосы" && <div className="absolute inset-0 opacity-25" style={{ backgroundImage: "repeating-linear-gradient(0deg, white 0px, white 2px, transparent 2px, transparent 14px)" }} />}
+                          {selectedPattern === "Клетка" && <div className="absolute inset-0 opacity-25" style={{ backgroundImage: "repeating-linear-gradient(0deg,white 0,white 1px,transparent 1px,transparent 22px),repeating-linear-gradient(90deg,white 0,white 1px,transparent 1px,transparent 22px)" }} />}
+                          {selectedPattern === "Точки" && <div className="absolute inset-0 opacity-25" style={{ backgroundImage: "radial-gradient(circle,white 1.5px,transparent 1.5px)", backgroundSize: "12px 12px" }} />}
+                          {selectedPattern === "Диагональ" && <div className="absolute inset-0 opacity-25" style={{ backgroundImage: "repeating-linear-gradient(45deg,white 0,white 1px,transparent 0,transparent 50%)", backgroundSize: "14px 14px" }} />}
+                          {selectedPattern === "Соты" && <div className="absolute inset-0 opacity-15" style={{ backgroundImage: "radial-gradient(circle at 50% 50%,white 2px,transparent 2px)", backgroundSize: "16px 16px" }} />}
+                        </div>
                       )}
                     </div>
+                    {/* Текст поверх */}
+                    {designText && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ margin: "8% 14%" }}>
+                        <span
+                          className="text-center font-bold leading-tight px-2 break-all"
+                          style={{ color: textColor, fontSize: `${fontSize}px`, textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}
+                        >
+                          {designText}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                </div>
-                <p className="text-muted-foreground text-xs mt-6">{selectedModel}</p>
+                ) : (
+                  /* FLAT VIEW */
+                  <div className="relative w-52 h-80 rounded-3xl overflow-hidden shadow-2xl border-2 border-white/10 flex-shrink-0">
+                    {uploadedImage ? (
+                      <img src={uploadedImage} alt="Ваш дизайн" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full relative" style={{ backgroundColor: selectedColor }}>
+                        {selectedPattern === "Полосы" && <div className="absolute inset-0 opacity-25" style={{ backgroundImage: "repeating-linear-gradient(0deg,white 0,white 2px,transparent 2px,transparent 14px)" }} />}
+                        {selectedPattern === "Клетка" && <div className="absolute inset-0 opacity-25" style={{ backgroundImage: "repeating-linear-gradient(0deg,white 0,white 1px,transparent 1px,transparent 22px),repeating-linear-gradient(90deg,white 0,white 1px,transparent 1px,transparent 22px)" }} />}
+                        {selectedPattern === "Точки" && <div className="absolute inset-0 opacity-25" style={{ backgroundImage: "radial-gradient(circle,white 1.5px,transparent 1.5px)", backgroundSize: "12px 12px" }} />}
+                        {selectedPattern === "Диагональ" && <div className="absolute inset-0 opacity-25" style={{ backgroundImage: "repeating-linear-gradient(45deg,white 0,white 1px,transparent 0,transparent 50%)", backgroundSize: "14px 14px" }} />}
+                        {selectedPattern === "Соты" && <div className="absolute inset-0 opacity-15" style={{ backgroundImage: "radial-gradient(circle at 50% 50%,white 2px,transparent 2px)", backgroundSize: "16px 16px" }} />}
+                      </div>
+                    )}
+                    {designText && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-center font-bold px-4 break-all" style={{ color: textColor, fontSize: `${fontSize}px`, textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>
+                          {designText}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <p className="text-muted-foreground text-xs mt-6 font-display">{selectedModel}</p>
+
+                {uploadedImage && (
+                  <button
+                    onClick={() => setUploadedImage(null)}
+                    className="mt-3 text-xs text-muted-foreground hover:text-destructive transition-colors flex items-center gap-1"
+                  >
+                    <Icon name="X" size={12} /> Удалить изображение
+                  </button>
+                )}
               </div>
 
-              {/* Controls */}
-              <div className="space-y-6">
+              {/* ===== CONTROLS PANEL ===== */}
+              <div className="space-y-5">
+
+                {/* Модель */}
                 <div>
-                  <label className="tag block mb-3">Модель телефона</label>
+                  <label className="tag block mb-2">Модель телефона</label>
                   <select
                     value={selectedModel}
                     onChange={e => setSelectedModel(e.target.value)}
@@ -377,60 +488,122 @@ export default function Index() {
                   </select>
                 </div>
 
+                {/* Загрузка изображения */}
                 <div>
-                  <label className="tag block mb-3">Цвет чехла</label>
-                  <div className="flex gap-3 flex-wrap">
-                    {designColors.map(c => (
-                      <button
-                        key={c}
-                        onClick={() => setSelectedColor(c)}
-                        className="w-9 h-9 rounded-full border-2 transition-all"
-                        style={{
-                          backgroundColor: c,
-                          borderColor: selectedColor === c ? "hsl(42, 85%, 52%)" : "hsl(220, 12%, 25%)",
-                          transform: selectedColor === c ? "scale(1.15)" : "scale(1)",
-                        }}
-                      />
-                    ))}
+                  <label className="tag block mb-2">Ваше изображение</label>
+                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleInputChange} />
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
+                    onDragLeave={() => setIsDragOver(false)}
+                    onDrop={handleDrop}
+                    className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all ${isDragOver ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-secondary/50"}`}
+                  >
+                    {uploadedImage ? (
+                      <div className="flex items-center gap-3">
+                        <img src={uploadedImage} alt="preview" className="w-12 h-12 object-cover rounded" />
+                        <div className="text-left">
+                          <p className="text-sm font-display font-semibold text-foreground">Изображение загружено</p>
+                          <p className="text-xs text-muted-foreground">Нажмите, чтобы заменить</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <Icon name="Upload" size={28} className="text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm font-display font-medium text-foreground">Перетащите фото или нажмите</p>
+                        <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WEBP до 10 МБ</p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div>
-                  <label className="tag block mb-3">Паттерн</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {designPatterns.map(pattern => (
-                      <button
-                        key={pattern}
-                        onClick={() => setSelectedPattern(pattern)}
-                        className={`py-2.5 px-3 rounded border text-xs font-display font-medium transition-all ${selectedPattern === pattern ? "btn-gold border-transparent" : "border-border text-muted-foreground hover:border-primary hover:text-primary"}`}
-                      >
-                        {pattern}
-                      </button>
-                    ))}
+                {/* Цвет (только без изображения) */}
+                {!uploadedImage && (
+                  <div>
+                    <label className="tag block mb-2">Цвет фона</label>
+                    <div className="flex gap-2 flex-wrap">
+                      {designColors.map(c => (
+                        <button
+                          key={c}
+                          onClick={() => setSelectedColor(c)}
+                          className="w-8 h-8 rounded-full border-2 transition-all"
+                          style={{
+                            backgroundColor: c,
+                            borderColor: selectedColor === c ? "hsl(42,85%,52%)" : "hsl(220,12%,25%)",
+                            transform: selectedColor === c ? "scale(1.2)" : "scale(1)",
+                            boxShadow: c === "#e8e8e8" ? "inset 0 0 0 1px rgba(0,0,0,0.2)" : "none",
+                          }}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
+                {/* Паттерн (только без изображения) */}
+                {!uploadedImage && (
+                  <div>
+                    <label className="tag block mb-2">Паттерн</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {designPatterns.map(pattern => (
+                        <button
+                          key={pattern}
+                          onClick={() => setSelectedPattern(pattern)}
+                          className={`py-2 px-3 rounded border text-xs font-display font-medium transition-all ${selectedPattern === pattern ? "btn-gold border-transparent" : "border-border text-muted-foreground hover:border-primary hover:text-primary"}`}
+                        >
+                          {pattern}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Текст */}
                 <div>
-                  <label className="tag block mb-3">Текст на чехле</label>
+                  <label className="tag block mb-2">Текст на чехле</label>
                   <input
                     type="text"
                     value={designText}
                     onChange={e => setDesignText(e.target.value)}
-                    placeholder="Ваш текст (до 20 символов)"
-                    maxLength={20}
-                    className="w-full bg-secondary border border-border rounded px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                    placeholder="Ваш текст (до 25 символов)"
+                    maxLength={25}
+                    className="w-full bg-secondary border border-border rounded px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary mb-3"
                   />
+                  {designText && (
+                    <div className="flex gap-4 items-center">
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-muted-foreground">Цвет</label>
+                        <input
+                          type="color"
+                          value={textColor}
+                          onChange={e => setTextColor(e.target.value)}
+                          className="w-8 h-8 rounded cursor-pointer border border-border bg-transparent"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 flex-1">
+                        <label className="text-xs text-muted-foreground whitespace-nowrap">Размер {fontSize}px</label>
+                        <input
+                          type="range"
+                          min={10}
+                          max={32}
+                          value={fontSize}
+                          onChange={e => setFontSize(Number(e.target.value))}
+                          className="flex-1 accent-primary"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                <div className="flex gap-3 pt-2">
+                {/* CTA */}
+                <div className="flex gap-3 pt-1">
                   <button onClick={saveDesign} className="btn-outline-gold flex-1 py-3 rounded text-xs flex items-center justify-center gap-2">
-                    <Icon name="Save" size={14} /> Сохранить дизайн
+                    <Icon name="Save" size={14} /> Сохранить
                   </button>
                   <button
-                    onClick={() => addToCart({ id: 99, name: "Мой дизайн", model: selectedModel, price: 1890, tag: "Custom", color: selectedColor })}
+                    onClick={() => addToCart({ id: 99, name: designText || "Мой дизайн", model: selectedModel, price: 1890, tag: "Custom", color: selectedColor })}
                     className="btn-gold flex-1 py-3 rounded text-xs"
                   >
-                    Заказать — 1 890 ₽
+                    В корзину — 1 890 ₽
                   </button>
                 </div>
 
